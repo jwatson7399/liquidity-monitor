@@ -90,6 +90,16 @@ def get_stablecoin_history(conn, days: int = 2000) -> list[dict]:
     return history
 
 
+def get_ism_history(conn, days: int = 2000) -> list[dict]:
+    """Get NFCI (Financial Conditions) history.
+
+    Kept as 'ism' naming for compatibility with the dashboard.
+    NFCI: negative = loose conditions, positive = tight conditions.
+    """
+    rows = storage.get_series_history(conn, "NFCI", days)
+    return [{"date": r["date"], "value": round(r["value"], 2)} for r in rows]
+
+
 def get_btc_history(conn, days: int = 2000) -> list[dict]:
     """Get BTC price history."""
     rows = storage.get_series_history(conn, "BTC_USD", days)

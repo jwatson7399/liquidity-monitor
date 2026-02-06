@@ -23,6 +23,7 @@ jobs:
       - name: Generate dashboard
         env:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          COINGECKO_API_KEY: ${{ secrets.COINGECKO_API_KEY }}
         run: python generate_site.py
 
       - name: Commit and push

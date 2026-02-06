@@ -12,7 +12,10 @@ from ..metrics import (
     get_net_liquidity_history,
     get_global_liquidity_history,
     get_stablecoin_history,
+    get_ism_history,
     get_btc_history,
+    get_eth_history,
+    get_altcoin_history,
     get_liquidity_impulse,
     get_regime,
 )
@@ -28,7 +31,10 @@ def _build_dashboard_data() -> dict:
     net_liq_history = get_net_liquidity_history(conn)
     global_liq_history = get_global_liquidity_history(conn)
     stablecoin_history = get_stablecoin_history(conn)
+    ism_history = get_ism_history(conn)
     btc_history = get_btc_history(conn)
+    eth_history = get_eth_history(conn)
+    altcoin_history = get_altcoin_history(conn)
     impulse = get_liquidity_impulse(net_liq_history)
     regime = get_regime(impulse)
 
@@ -73,11 +79,29 @@ def _build_dashboard_data() -> dict:
         if len(global_liq_history) > 4:
             gl_prev = global_liq_history[-5]["value"]
             summary["global_30d_pct"] = round((global_liq_history[-1]["value"] - gl_prev) / gl_prev * 100, 1)
+    if eth_history:
+        summary["eth_price"] = round(eth_history[-1]["value"], 0)
+        if len(eth_history) > 30:
+            eth_30d = eth_history[-31]["value"]
+            summary["eth_30d_pct"] = round((eth_history[-1]["value"] - eth_30d) / eth_30d * 100, 1)
+    if altcoin_history:
+        summary["altcoin_mcap"] = round(altcoin_history[-1]["value"], 1)
+        if len(altcoin_history) > 30:
+            alt_30d = altcoin_history[-31]["value"]
+            summary["altcoin_30d_pct"] = round((altcoin_history[-1]["value"] - alt_30d) / alt_30d * 100, 1)
+    if ism_history:
+        summary["ism"] = ism_history[-1]["value"]
+        if len(ism_history) >= 2:
+            summary["ism_prev"] = ism_history[-2]["value"]
+            summary["ism_change"] = round(ism_history[-1]["value"] - ism_history[-2]["value"], 2)
 
     return {
         "table": table_rows,
         "chart_net_liq": chart_net_liq,
         "chart_btc": btc_history,
+        "chart_eth": eth_history,
+        "chart_altcoins": altcoin_history,
+        "chart_ism": ism_history,
         "chart_stablecoin": stablecoin_history,
         "chart_global_liq": global_liq_history,
         "regime": regime,

@@ -247,6 +247,7 @@
                     <button class="toggle-btn active" data-series="btc"><span class="legend-dot" style="background:#f7931a"></span>BTC</button>
                     <button class="toggle-btn active" data-series="eth"><span class="legend-dot" style="background:#627eea"></span>ETH</button>
                     <button class="toggle-btn active" data-series="alts"><span class="legend-dot" style="background:#e6007a"></span>Altcoins (ex-BTC)</button>
+                    <button class="toggle-btn active" data-series="ism"><span class="legend-dot" style="background:#f59e0b"></span>NFCI</button>
                 </div>
             </div>
             <div class="range-btns" id="range-btns-main">
@@ -316,6 +317,9 @@
 
             <h3>Stablecoin Supply (USDT + USDC)</h3>
             <p>Crypto's own liquidity proxy. Stablecoin market cap represents fiat capital sitting on-chain, ready to deploy into crypto. Sustained growth in stablecoin supply tends to precede or accompany crypto rallies, while contraction signals capital leaving the ecosystem.</p>
+
+            <h3>Financial Conditions (NFCI)</h3>
+            <p>The Chicago Fed National Financial Conditions Index measures the tightness or looseness of US financial conditions across money markets, debt, equity, and the banking system. Negative values mean conditions are looser than average — cheap funding, easy credit, high risk appetite. Positive values mean tighter conditions. For crypto, this is a direct measure of the environment: the more negative the NFCI, the more favorable the conditions for liquidity-sensitive risk assets. Rapid moves toward tighter conditions (rising NFCI) tend to coincide with risk-off episodes. Updated weekly.</p>
 
             <h3>Liquidity Impulse</h3>
             <p>The 30-day rate of change in net liquidity. For risk assets, direction matters more than level. A positive impulse means liquidity conditions are improving — historically a favorable setup for crypto. A negative impulse signals tightening conditions.</p>
@@ -391,6 +395,14 @@
             var stChg = s.stablecoin_30d_change !== undefined ? ((s.stablecoin_30d_change >= 0 ? '+' : '') + s.stablecoin_30d_change.toFixed(1) + 'B') : '\u2014';
             var stClass = (s.stablecoin_30d_change !== undefined && s.stablecoin_30d_change >= 0) ? 'pos' : 'neg';
             cardsHtml += '<div class="card"><div class="card-label">Stablecoin Supply</div><div class="card-value">$' + s.stablecoin_total.toFixed(0) + 'B</div><div class="card-sub ' + stClass + '">30d: ' + stChg + '</div></div>';
+        }
+        if (s.ism !== undefined) {
+            var nfciLoose = s.ism < 0;
+            var nfciClass = nfciLoose ? 'pos' : 'neg';
+            var nfciLabel = nfciLoose ? 'Loose' : 'Tight';
+            var nfciChgStr = s.ism_change !== undefined ? ((s.ism_change >= 0 ? '+' : '') + s.ism_change.toFixed(2)) : '\u2014';
+            var nfciChgClass = (s.ism_change !== undefined && s.ism_change <= 0) ? 'pos' : 'neg';
+            cardsHtml += '<div class="card"><div class="card-label">Financial Conditions</div><div class="card-value">' + s.ism.toFixed(2) + '</div><div class="card-sub ' + nfciClass + '">' + nfciLabel + ' <span class="' + nfciChgClass + '">(' + nfciChgStr + ')</span></div></div>';
         }
         if (DATA.impulse) {
             var impulseClass = DATA.impulse.change_billions >= 0 ? 'pos' : 'neg';
@@ -508,6 +520,19 @@
             mainChart.priceScale('alts-scale').applyOptions({ visible: false });
         }
 
+        // NFCI Financial Conditions (own hidden axis, typically -1.0 to +1.0)
+        if (DATA.chart_ism && DATA.chart_ism.length > 0) {
+            mainSeries.ism = mainChart.addLineSeries({
+                color: '#f59e0b',
+                lineWidth: 2,
+                lineStyle: 2,
+                priceScaleId: 'ism-scale',
+                priceFormat: { type: 'custom', formatter: function(p) { return 'NFCI ' + p.toFixed(2); } },
+            });
+            mainSeries.ism.setData(toChartPoints(DATA.chart_ism));
+            mainChart.priceScale('ism-scale').applyOptions({ visible: false });
+        }
+
         mainChart.timeScale().fitContent();
         bindRangeButtons('range-btns-main', mainChart);
         new ResizeObserver(function() {
@@ -521,6 +546,7 @@
             btc: DATA.chart_btc ? toChartPoints(DATA.chart_btc) : [],
             eth: DATA.chart_eth ? toChartPoints(DATA.chart_eth) : [],
             alts: DATA.chart_altcoins ? toChartPoints(DATA.chart_altcoins) : [],
+            ism: DATA.chart_ism ? toChartPoints(DATA.chart_ism) : [],
         };
 
         document.querySelectorAll('.toggle-btn[data-series]').forEach(function(btn) {

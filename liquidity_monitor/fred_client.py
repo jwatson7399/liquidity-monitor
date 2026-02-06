@@ -26,8 +26,13 @@ FX_SERIES = {
     "DEXUSEU": "EUR/USD Rate",
 }
 
+# Macro / financial conditions indicators
+MACRO_SERIES = {
+    "NFCI": "Financial Conditions (NFCI)",
+}
+
 # Everything we fetch from FRED
-ALL_FRED_SERIES = {**SERIES, **GLOBAL_SERIES, **FX_SERIES}
+ALL_FRED_SERIES = {**SERIES, **GLOBAL_SERIES, **FX_SERIES, **MACRO_SERIES}
 
 DEFAULT_LOOKBACK_DAYS = 1900  # ~5.2 years
 

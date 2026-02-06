@@ -20,6 +20,7 @@ from liquidity_monitor.metrics import (
     get_net_liquidity_history,
     get_global_liquidity_history,
     get_stablecoin_history,
+    get_ism_history,
     get_btc_history,
     get_eth_history,
     get_altcoin_history,
@@ -70,6 +71,7 @@ def build_data() -> dict:
     net_liq_history = get_net_liquidity_history(conn)
     global_liq_history = get_global_liquidity_history(conn)
     stablecoin_history = get_stablecoin_history(conn)
+    ism_history = get_ism_history(conn)
     btc_history = get_btc_history(conn)
     eth_history = get_eth_history(conn)
     altcoin_history = get_altcoin_history(conn, global_stats=global_stats)
@@ -141,7 +143,7 @@ def build_data() -> dict:
             eth_30d = eth_history[-31]["value"]
             summary["eth_30d_pct"] = round((eth_latest - eth_30d) / eth_30d * 100, 1)
 
-    # Altcoin (ETH mcap) summary
+    # Altcoin summary
     if altcoin_history:
         alt_latest = altcoin_history[-1]["value"]
         summary["altcoin_mcap"] = round(alt_latest, 1)
@@ -149,12 +151,21 @@ def build_data() -> dict:
             alt_30d = altcoin_history[-31]["value"]
             summary["altcoin_30d_pct"] = round((alt_latest - alt_30d) / alt_30d * 100, 1)
 
+    # ISM summary
+    if ism_history:
+        ism_latest = ism_history[-1]["value"]
+        summary["ism"] = ism_latest
+        if len(ism_history) >= 2:
+            summary["ism_prev"] = ism_history[-2]["value"]
+            summary["ism_change"] = round(ism_latest - ism_history[-2]["value"], 2)
+
     return {
         "table": table_rows,
         "chart_net_liq": chart_net_liq,
         "chart_btc": btc_history,
         "chart_eth": eth_history,
         "chart_altcoins": altcoin_history,
+        "chart_ism": ism_history,
         "chart_stablecoin": stablecoin_history,
         "chart_global_liq": global_liq_history,
         "regime": regime,
