@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>US Liquidity Monitor</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #0d1117;
+            color: #e6e6e6;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            line-height: 1.5;
+            padding: 1.5rem;
+            max-width: 960px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+
+        h1 {
+            font-size: 1.4rem;
+            font-weight: 600;
+            color: #f0f6fc;
+        }
+
+        .subtitle {
+            color: #8b949e;
+            font-size: 0.8rem;
+            margin-top: 0.15rem;
+        }
+
+        .updated {
+            color: #484f58;
+            font-size: 0.75rem;
+            text-align: right;
+        }
+
+        /* Table */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 1.5rem;
+            font-size: 0.85rem;
+        }
+
+        th {
+            text-align: left;
+            padding: 0.6rem 0.75rem;
+            color: #58a6ff;
+            font-weight: 600;
+            border-bottom: 2px solid #21262d;
+            white-space: nowrap;
+        }
+        th:not(:first-child) { text-align: right; }
+
+        td {
+            padding: 0.55rem 0.75rem;
+            border-bottom: 1px solid #161b22;
+            white-space: nowrap;
+        }
+        td:not(:first-child) {
+            text-align: right;
+            font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+            font-size: 0.82rem;
+        }
+
+        tr:hover { background: rgba(56, 139, 253, 0.04); }
+
+        tr.separator td {
+            border-top: 2px solid #30363d;
+            padding-top: 0.7rem;
+            font-weight: 600;
+            color: #f0f6fc;
+        }
+
+        .date-col { color: #8b949e; }
+        .pos { color: #3fb950; }
+        .neg { color: #f85149; }
+        .na  { color: #484f58; }
+
+        /* Chart */
+        .chart-section {
+            background: #161b22;
+            border: 1px solid #21262d;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .chart-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+            color: #f0f6fc;
+        }
+
+        #chart-area {
+            width: 100%;
+            height: 340px;
+        }
+
+        footer {
+            color: #484f58;
+            font-size: 0.72rem;
+            text-align: center;
+            padding-top: 0.5rem;
+        }
+
+        @media (max-width: 600px) {
+            body { padding: 1rem; }
+            table { font-size: 0.75rem; }
+            td, th { padding: 0.4rem 0.5rem; }
+            #chart-area { height: 260px; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div>
+            <h1>US Liquidity Monitor</h1>
+            <div class="subtitle">Source: FRED / Federal Reserve Bank of St. Louis</div>
+        </div>
+        <div class="updated" id="updated"></div>
+    </header>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Metric</th>
+                <th>Latest</th>
+                <th>As Of</th>
+                <th>1W Chg</th>
+                <th>1M Chg</th>
+            </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+    </table>
+
+    <div class="chart-section">
+        <div class="chart-title">Net Liquidity Trend (90 days)</div>
+        <div id="chart-area"></div>
+    </div>
+
+    <footer>
+        Data updates vary by series: daily (Reverse Repos), weekly (Balance Sheet, Reserves, TGA), monthly (M2).
+        <br>Auto-updated daily via GitHub Actions.
+    </footer>
+
+    <script src="https://unpkg.com/lightweight-charts@4/dist/lightweight-charts.standalone.production.js"></script>
+    <script>
+        var DATA = {"table": [{"series_id": "WALCL", "label": "Fed Balance Sheet", "current": 6.6059, "current_date": "2026-02-04", "week_change": 18.3, "month_change": 32.3}, {"series_id": "WRESBAL", "label": "Bank Reserves", "current": 2.9252, "current_date": "2026-02-04", "week_change": 23.6, "month_change": -71.2}, {"series_id": "M2SL", "label": "M2 Money Supply", "current": 22.411, "current_date": "2025-12-01", "week_change": 0.0, "month_change": 0.0}, {"series_id": "WTREGEN", "label": "Treasury General Account", "current": 0.9088, "current_date": "2026-02-04", "week_change": -14.3, "month_change": 112.6}, {"series_id": "RRPONTSYD", "label": "Reverse Repos", "current": 0.0031, "current_date": "2026-02-06", "week_change": -6.5, "month_change": -1.5}, {"series_id": "NET_LIQUIDITY", "label": "Net Liquidity", "current": 5.694, "current_date": "2026-02-04", "week_change": 39.1, "month_change": -78.8}], "chart": [{"date": "2025-10-15", "value": 5.7814}, {"date": "2025-10-22", "value": 5.6775}, {"date": "2025-10-29", "value": 5.6095}, {"date": "2025-11-05", "value": 5.6189}, {"date": "2025-11-12", "value": 5.6208}, {"date": "2025-11-19", "value": 5.6122}, {"date": "2025-11-26", "value": 5.6468}, {"date": "2025-12-03", "value": 5.5961}, {"date": "2025-12-10", "value": 5.6753}, {"date": "2025-12-17", "value": 5.7134}, {"date": "2025-12-24", "value": 5.7393}, {"date": "2025-12-31", "value": 5.6973}, {"date": "2026-01-07", "value": 5.7729}, {"date": "2026-01-14", "value": 5.7993}, {"date": "2026-01-21", "value": 5.712}, {"date": "2026-01-28", "value": 5.6634}, {"date": "2026-02-04", "value": 5.6947}], "generated_at": "2026-02-06 19:27 UTC"};
+
+        // --- Render table ---
+        function chgClass(v) {
+            if (v === null || v === undefined) return 'na';
+            return v >= 0 ? 'pos' : 'neg';
+        }
+
+        function fmtChg(v) {
+            if (v === null || v === undefined) return '\u2014';
+            return (v >= 0 ? '+' : '') + v.toFixed(1) + 'B';
+        }
+
+        var html = '';
+        for (var i = 0; i < DATA.table.length; i++) {
+            var r = DATA.table[i];
+            var cls = r.series_id === 'NET_LIQUIDITY' ? ' class="separator"' : '';
+            html += '<tr' + cls + '>';
+            html += '<td>' + r.label + '</td>';
+            html += '<td>$' + r.current.toFixed(3) + 'T</td>';
+            html += '<td class="date-col">' + r.current_date + '</td>';
+            html += '<td class="' + chgClass(r.week_change) + '">' + fmtChg(r.week_change) + '</td>';
+            html += '<td class="' + chgClass(r.month_change) + '">' + fmtChg(r.month_change) + '</td>';
+            html += '</tr>';
+        }
+        document.getElementById('table-body').innerHTML = html;
+        document.getElementById('updated').textContent = 'Updated: ' + DATA.generated_at;
+
+        // --- Chart ---
+        var container = document.getElementById('chart-area');
+        var chart = LightweightCharts.createChart(container, {
+            height: container.clientHeight,
+            layout: {
+                background: { color: '#161b22' },
+                textColor: '#8b949e',
+                fontSize: 11,
+            },
+            grid: {
+                vertLines: { color: '#21262d' },
+                horzLines: { color: '#21262d' },
+            },
+            crosshair: { mode: LightweightCharts.CrosshairMode.Magnet },
+            timeScale: {
+                borderColor: '#30363d',
+                timeVisible: false,
+            },
+            rightPriceScale: {
+                borderColor: '#30363d',
+            },
+        });
+
+        var areaSeries = chart.addAreaSeries({
+            topColor: 'rgba(38, 166, 154, 0.35)',
+            bottomColor: 'rgba(38, 166, 154, 0.0)',
+            lineColor: '#26a69a',
+            lineWidth: 2,
+        });
+
+        areaSeries.setData(DATA.chart.map(function(p) {
+            return { time: p.date, value: p.value };
+        }));
+
+        chart.timeScale().fitContent();
+
+        new ResizeObserver(function() {
+            chart.applyOptions({ width: container.clientWidth });
+        }).observe(container);
+    </script>
+</body>
+</html>

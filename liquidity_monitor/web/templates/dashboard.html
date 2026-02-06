@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>US Liquidity Monitor</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #0d1117;
+            color: #e6e6e6;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            line-height: 1.5;
+            padding: 1.5rem;
+            max-width: 960px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+        }
+
+        h1 {
+            font-size: 1.4rem;
+            font-weight: 600;
+            color: #f0f6fc;
+        }
+
+        .subtitle {
+            color: #8b949e;
+            font-size: 0.8rem;
+            margin-top: 0.15rem;
+        }
+
+        #refresh-btn {
+            background: #21262d;
+            color: #c9d1d9;
+            border: 1px solid #30363d;
+            padding: 0.4rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: background 0.15s;
+        }
+        #refresh-btn:hover { background: #30363d; }
+        #refresh-btn:disabled { opacity: 0.5; cursor: wait; }
+
+        .toast {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            background: #238636;
+            color: #fff;
+            padding: 0.6rem 1rem;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+        .toast.show { opacity: 1; }
+        .toast.error { background: #da3633; }
+
+        /* Table */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 1.5rem;
+            font-size: 0.85rem;
+        }
+
+        th {
+            text-align: left;
+            padding: 0.6rem 0.75rem;
+            color: #58a6ff;
+            font-weight: 600;
+            border-bottom: 2px solid #21262d;
+            white-space: nowrap;
+        }
+        th:not(:first-child) { text-align: right; }
+
+        td {
+            padding: 0.55rem 0.75rem;
+            border-bottom: 1px solid #161b22;
+            white-space: nowrap;
+        }
+        td:not(:first-child) {
+            text-align: right;
+            font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+            font-size: 0.82rem;
+        }
+
+        tr:hover { background: rgba(56, 139, 253, 0.04); }
+
+        tr.separator td {
+            border-top: 2px solid #30363d;
+            padding-top: 0.7rem;
+            font-weight: 600;
+            color: #f0f6fc;
+        }
+
+        .date-col { color: #8b949e; }
+        .pos { color: #3fb950; }
+        .neg { color: #f85149; }
+        .na  { color: #484f58; }
+
+        /* Chart */
+        .chart-section {
+            background: #161b22;
+            border: 1px solid #21262d;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .chart-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+            color: #f0f6fc;
+        }
+
+        #chart-area {
+            width: 100%;
+            height: 340px;
+        }
+
+        footer {
+            color: #484f58;
+            font-size: 0.72rem;
+            text-align: center;
+            padding-top: 0.5rem;
+        }
+
+        @media (max-width: 600px) {
+            body { padding: 1rem; }
+            table { font-size: 0.75rem; }
+            td, th { padding: 0.4rem 0.5rem; }
+            #chart-area { height: 260px; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div>
+            <h1>US Liquidity Monitor</h1>
+            <div class="subtitle">Source: FRED / Federal Reserve Bank of St. Louis</div>
+        </div>
+        <button id="refresh-btn">Refresh from FRED</button>
+    </header>
+
+    <div id="toast" class="toast"></div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Metric</th>
+                <th>Latest</th>
+                <th>As Of</th>
+                <th>1W Chg</th>
+                <th>1M Chg</th>
+            </tr>
+        </thead>
+        <tbody id="table-body">
+            {% for row in data.table %}
+            <tr{% if row.series_id == 'NET_LIQUIDITY' %} class="separator"{% endif %}>
+                <td>{{ row.label }}</td>
+                <td>${{ "%.3f"|format(row.current) }}T</td>
+                <td class="date-col">{{ row.current_date }}</td>
+                <td class="{{ 'pos' if row.week_change is not none and row.week_change >= 0 else ('neg' if row.week_change is not none else 'na') }}">
+                    {% if row.week_change is not none %}{{ '+' if row.week_change >= 0 }}{{ "%.1f"|format(row.week_change) }}B{% else %}&mdash;{% endif %}
+                </td>
+                <td class="{{ 'pos' if row.month_change is not none and row.month_change >= 0 else ('neg' if row.month_change is not none else 'na') }}">
+                    {% if row.month_change is not none %}{{ '+' if row.month_change >= 0 }}{{ "%.1f"|format(row.month_change) }}B{% else %}&mdash;{% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="chart-section">
+        <div class="chart-title">Net Liquidity Trend (90 days)</div>
+        <div id="chart-area"></div>
+    </div>
+
+    <footer>
+        Data updates vary by series: daily (Reverse Repos), weekly (Balance Sheet, Reserves, TGA), monthly (M2).
+    </footer>
+
+    <script src="https://unpkg.com/lightweight-charts@4/dist/lightweight-charts.standalone.production.js"></script>
+    <script>
+        const initialData = {{ data.chart | tojson }};
+
+        // --- Chart ---
+        const container = document.getElementById('chart-area');
+        const chart = LightweightCharts.createChart(container, {
+            height: container.clientHeight,
+            layout: {
+                background: { color: '#161b22' },
+                textColor: '#8b949e',
+                fontSize: 11,
+            },
+            grid: {
+                vertLines: { color: '#21262d' },
+                horzLines: { color: '#21262d' },
+            },
+            crosshair: { mode: LightweightCharts.CrosshairMode.Magnet },
+            timeScale: {
+                borderColor: '#30363d',
+                timeVisible: false,
+            },
+            rightPriceScale: {
+                borderColor: '#30363d',
+            },
+        });
+
+        const areaSeries = chart.addAreaSeries({
+            topColor: 'rgba(38, 166, 154, 0.35)',
+            bottomColor: 'rgba(38, 166, 154, 0.0)',
+            lineColor: '#26a69a',
+            lineWidth: 2,
+        });
+
+        function setChartData(data) {
+            areaSeries.setData(data.map(function(p) {
+                return { time: p.date, value: p.value };
+            }));
+            chart.timeScale().fitContent();
+        }
+
+        setChartData(initialData);
+
+        new ResizeObserver(function() {
+            chart.applyOptions({ width: container.clientWidth });
+        }).observe(container);
+
+        // --- Table update ---
+        function renderTable(rows) {
+            var html = '';
+            for (var i = 0; i < rows.length; i++) {
+                var r = rows[i];
+                var cls = r.series_id === 'NET_LIQUIDITY' ? ' class="separator"' : '';
+                html += '<tr' + cls + '>';
+                html += '<td>' + r.label + '</td>';
+                html += '<td>$' + r.current.toFixed(3) + 'T</td>';
+                html += '<td class="date-col">' + r.current_date + '</td>';
+                html += '<td class="' + chgClass(r.week_change) + '">' + fmtChg(r.week_change) + '</td>';
+                html += '<td class="' + chgClass(r.month_change) + '">' + fmtChg(r.month_change) + '</td>';
+                html += '</tr>';
+            }
+            document.getElementById('table-body').innerHTML = html;
+        }
+
+        function chgClass(v) {
+            if (v === null || v === undefined) return 'na';
+            return v >= 0 ? 'pos' : 'neg';
+        }
+
+        function fmtChg(v) {
+            if (v === null || v === undefined) return '\u2014';
+            return (v >= 0 ? '+' : '') + v.toFixed(1) + 'B';
+        }
+
+        // --- Refresh ---
+        var toast = document.getElementById('toast');
+        function showToast(msg, isError) {
+            toast.textContent = msg;
+            toast.className = 'toast show' + (isError ? ' error' : '');
+            setTimeout(function() { toast.className = 'toast'; }, 3000);
+        }
+
+        document.getElementById('refresh-btn').addEventListener('click', function() {
+            var btn = this;
+            btn.disabled = true;
+            btn.textContent = 'Refreshing\u2026';
+
+            fetch('/api/refresh', { method: 'POST' })
+                .then(function(resp) { return resp.json(); })
+                .then(function(data) {
+                    if (data.error) {
+                        showToast(data.error, true);
+                        return;
+                    }
+                    renderTable(data.table);
+                    setChartData(data.chart);
+                    showToast('Updated \u2014 ' + data.refreshed + ' rows refreshed');
+                })
+                .catch(function(e) {
+                    showToast('Refresh failed: ' + e.message, true);
+                })
+                .finally(function() {
+                    btn.disabled = false;
+                    btn.textContent = 'Refresh from FRED';
+                });
+        });
+    </script>
+</body>
+</html>
