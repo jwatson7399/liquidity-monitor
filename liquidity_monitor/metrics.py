@@ -45,24 +45,31 @@ def get_global_liquidity_history(conn, days: int = 2000) -> list[dict]:
     if not ecb or not fx:
         return []
 
-    # Build a lookup for nearest FX rate (forward-fill)
+    # Sort auxiliary series dates for forward-fill lookups
     fx_dates = sorted(fx.keys())
     ecb_dates = sorted(ecb.keys())
 
+    def ffill_lookup(sorted_dates, lookup, target):
+        """Find the most recent value on or before target date."""
+        best = None
+        for dt in sorted_dates:
+            if dt <= target:
+                best = lookup[dt]
+            else:
+                break
+        return best
+
     history = []
-    fx_idx = 0
-    for d in sorted(set(walcl) & set(ecb)):
-        # Find closest FX rate on or before this date
-        while fx_idx < len(fx_dates) - 1 and fx_dates[fx_idx + 1] <= d:
-            fx_idx += 1
-        if fx_idx >= len(fx_dates) or fx_dates[fx_idx] > d:
+    for d in sorted(walcl.keys()):
+        ecb_val = ffill_lookup(ecb_dates, ecb, d)
+        fx_val = ffill_lookup(fx_dates, fx, d)
+        if ecb_val is None or fx_val is None:
             continue
-        rate = fx[fx_dates[fx_idx]]
 
         # Fed: millions USD -> trillions
         fed_t = walcl[d] / 1e6
         # ECB: millions EUR * USD/EUR rate -> millions USD -> trillions
-        ecb_t = (ecb[d] * rate) / 1e6
+        ecb_t = (ecb_val * fx_val) / 1e6
 
         history.append({"date": d, "value": round(fed_t + ecb_t, 4)})
 
