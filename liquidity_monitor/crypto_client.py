@@ -19,13 +19,9 @@ CRYPTO_FETCHES = [
     ("usd-coin", [("USDC_MCAP", "market_caps")]),
 ]
 
-# Free tier: 365 days max. With demo key: unlimited.
-FREE_MAX_DAYS = 365
-FULL_DAYS = 1825
-
-
-def _get_max_days() -> int:
-    return FULL_DAYS if os.environ.get("COINGECKO_API_KEY") else FREE_MAX_DAYS
+# CoinGecko demo plan: 365 days max (same as unauthenticated).
+# Pro plan ($) would allow FULL_DAYS. Demo key still helps with rate limits.
+MAX_DAYS = 365
 
 
 def _get_headers() -> dict:
@@ -66,10 +62,7 @@ def fetch_all_crypto() -> dict:
 
     Returns {series_id: [observations]}.
     """
-    days = _get_max_days()
-    has_key = bool(os.environ.get("COINGECKO_API_KEY"))
-    if not has_key:
-        print(f"  (No COINGECKO_API_KEY — fetching {days}d. Set one for 5yr history)")
+    days = MAX_DAYS
 
     results = {}
     for coin_id, extractions in CRYPTO_FETCHES:
