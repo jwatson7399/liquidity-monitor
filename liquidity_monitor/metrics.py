@@ -102,13 +102,58 @@ def get_eth_history(conn, days: int = 2000) -> list[dict]:
     return [{"date": r["date"], "value": round(r["value"], 2)} for r in rows]
 
 
-def get_altcoin_history(conn, days: int = 2000) -> list[dict]:
-    """Get altcoin market cap history (ETH mcap as proxy for total altcoins).
+def get_altcoin_history(conn, global_stats=None, days: int = 2000) -> list[dict]:
+    """Get total altcoin market cap history (ex-BTC), in billions of USD.
 
-    Returns values in billions of USD.
+    Sums tracked alt mcaps (ETH, BNB, SOL, XRP), then scales up using
+    a factor derived from CoinGecko /global stats to estimate the full
+    altcoin market including the long tail of smaller coins.
     """
-    rows = storage.get_series_history(conn, "ETH_MCAP", days)
-    return [{"date": r["date"], "value": round(r["value"] / 1e9, 2)} for r in rows]
+    from .crypto_client import TRACKED_ALT_MCAPS
+
+    # Load all tracked alt mcap series
+    alt_series = {}
+    for sid in TRACKED_ALT_MCAPS:
+        alt_series[sid] = {
+            r["date"]: r["value"]
+            for r in storage.get_series_history(conn, sid, days)
+        }
+
+    # BTC mcap for computing altcoin = total - btc
+    btc_mcap = {
+        r["date"]: r["value"]
+        for r in storage.get_series_history(conn, "BTC_MCAP", days)
+    }
+
+    # Find dates where at least ETH_MCAP exists
+    all_dates = sorted(alt_series.get("ETH_MCAP", {}).keys())
+    if not all_dates:
+        return []
+
+    # Compute scaling factor: true_total_alts / tracked_alts_sum
+    # Uses current /global data to estimate how much the long tail adds.
+    scale = 1.0
+    if global_stats and btc_mcap:
+        total_mcap = global_stats["total_mcap"]
+        btc_pct = global_stats["btc_mcap_pct"]
+        true_alts = total_mcap * (1.0 - btc_pct / 100.0)
+
+        # Sum tracked alts for latest date to compute ratio
+        latest = all_dates[-1]
+        tracked_sum = sum(
+            s.get(latest, 0) for s in alt_series.values()
+        )
+        if tracked_sum > 0:
+            scale = true_alts / tracked_sum
+
+    history = []
+    for d in all_dates:
+        tracked_sum = sum(s.get(d, 0) for s in alt_series.values())
+        if tracked_sum > 0:
+            estimated_total = tracked_sum * scale
+            history.append({"date": d, "value": round(estimated_total / 1e9, 2)})
+
+    return history
 
 
 def get_liquidity_impulse(net_liq_history: list[dict]) -> dict | None:

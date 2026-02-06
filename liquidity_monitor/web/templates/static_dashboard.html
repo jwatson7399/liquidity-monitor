@@ -246,7 +246,7 @@
                     <button class="toggle-btn active" data-series="nl"><span class="legend-dot" style="background:#26a69a"></span>Net Liquidity</button>
                     <button class="toggle-btn active" data-series="btc"><span class="legend-dot" style="background:#f7931a"></span>BTC</button>
                     <button class="toggle-btn active" data-series="eth"><span class="legend-dot" style="background:#627eea"></span>ETH</button>
-                    <button class="toggle-btn active" data-series="alts"><span class="legend-dot" style="background:#e6007a"></span>Altcoins</button>
+                    <button class="toggle-btn active" data-series="alts"><span class="legend-dot" style="background:#e6007a"></span>Altcoins (ex-BTC)</button>
                 </div>
             </div>
             <div class="range-btns" id="range-btns-main">
@@ -380,7 +380,7 @@
         if (s.altcoin_mcap !== undefined) {
             var altChg = s.altcoin_30d_pct !== undefined ? fmtPct(s.altcoin_30d_pct) : '\u2014';
             var altClass = (s.altcoin_30d_pct !== undefined && s.altcoin_30d_pct >= 0) ? 'pos' : 'neg';
-            cardsHtml += '<div class="card"><div class="card-label">Altcoins (ETH mcap)</div><div class="card-value">$' + s.altcoin_mcap.toFixed(0) + 'B</div><div class="card-sub ' + altClass + '">30d: ' + altChg + '</div></div>';
+            cardsHtml += '<div class="card"><div class="card-label">Altcoins (ex-BTC)</div><div class="card-value">$' + s.altcoin_mcap.toFixed(0) + 'B</div><div class="card-sub ' + altClass + '">30d: ' + altChg + '</div></div>';
         }
         if (s.global_liquidity !== undefined) {
             var glChg = s.global_30d_pct !== undefined ? fmtPct(s.global_30d_pct) : '\u2014';

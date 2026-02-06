@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from liquidity_monitor.fred_client import fetch_all, get_api_key, SERIES, ALL_FRED_SERIES
-from liquidity_monitor.crypto_client import fetch_all_crypto
+from liquidity_monitor.crypto_client import fetch_all_crypto, fetch_global_stats
 from liquidity_monitor.storage import get_connection, init_db, upsert_observations
 from liquidity_monitor.metrics import (
     get_current_snapshot,
@@ -56,8 +56,14 @@ def build_data() -> dict:
     crypto_data = fetch_all_crypto()
     for series_id, observations in crypto_data.items():
         n = upsert_observations(conn, series_id, observations)
-        label = series_id
-        print(f"  {label}: {len(observations)} obs, {n} upserted")
+        print(f"  {series_id}: {len(observations)} obs, {n} upserted")
+
+    # Fetch current global stats for altcoin scaling
+    print("Fetching global market stats...")
+    global_stats = fetch_global_stats()
+    if global_stats:
+        total_b = global_stats["total_mcap"] / 1e9
+        print(f"  Total crypto mcap: ${total_b:.0f}B, BTC dominance: {global_stats['btc_mcap_pct']:.1f}%")
 
     # Build all metrics
     snapshot = get_current_snapshot(conn)
@@ -66,7 +72,7 @@ def build_data() -> dict:
     stablecoin_history = get_stablecoin_history(conn)
     btc_history = get_btc_history(conn)
     eth_history = get_eth_history(conn)
-    altcoin_history = get_altcoin_history(conn)
+    altcoin_history = get_altcoin_history(conn, global_stats=global_stats)
     impulse = get_liquidity_impulse(net_liq_history)
     regime = get_regime(impulse)
 

@@ -13,15 +13,20 @@ COINGECKO_BASE = "https://api.coingecko.com/api/v3"
 # Each fetch: (coin_id, [(series_id, field), ...])
 # Multiple fields extracted from a single API call to minimize requests.
 CRYPTO_FETCHES = [
-    ("bitcoin", [("BTC_USD", "prices")]),
+    ("bitcoin", [("BTC_USD", "prices"), ("BTC_MCAP", "market_caps")]),
     ("ethereum", [("ETH_USD", "prices"), ("ETH_MCAP", "market_caps")]),
+    ("binancecoin", [("BNB_MCAP", "market_caps")]),
+    ("solana", [("SOL_MCAP", "market_caps")]),
+    ("ripple", [("XRP_MCAP", "market_caps")]),
     ("tether", [("USDT_MCAP", "market_caps")]),
     ("usd-coin", [("USDC_MCAP", "market_caps")]),
 ]
 
-# CoinGecko demo plan: 365 days max (same as unauthenticated).
-# Pro plan ($) would allow FULL_DAYS. Demo key still helps with rate limits.
+# CoinGecko demo plan: 365 days max. Demo key helps with rate limits.
 MAX_DAYS = 365
+
+# Altcoin mcap series that get summed as "tracked alts"
+TRACKED_ALT_MCAPS = ["ETH_MCAP", "BNB_MCAP", "SOL_MCAP", "XRP_MCAP"]
 
 
 def _get_headers() -> dict:
@@ -57,17 +62,37 @@ def _fetch_coin(coin_id: str, days: int) -> dict:
     return resp.json()
 
 
+def fetch_global_stats() -> dict | None:
+    """Fetch current global crypto market stats from /global.
+
+    Returns {"total_mcap": float, "btc_mcap_pct": float} or None.
+    """
+    try:
+        resp = requests.get(
+            f"{COINGECKO_BASE}/global",
+            headers=_get_headers(),
+            timeout=15,
+        )
+        resp.raise_for_status()
+        data = resp.json().get("data", {})
+        total = data.get("total_market_cap", {}).get("usd")
+        btc_pct = data.get("market_cap_percentage", {}).get("btc")
+        if total and btc_pct:
+            return {"total_mcap": total, "btc_mcap_pct": btc_pct}
+    except Exception as e:
+        print(f"  Warning: failed to fetch /global: {e}")
+    return None
+
+
 def fetch_all_crypto() -> dict:
-    """Fetch BTC/ETH prices, ETH mcap (altcoin proxy), and stablecoin mcaps.
+    """Fetch BTC/ETH prices, top altcoin mcaps, and stablecoin mcaps.
 
     Returns {series_id: [observations]}.
     """
-    days = MAX_DAYS
-
     results = {}
     for coin_id, extractions in CRYPTO_FETCHES:
         try:
-            raw = _fetch_coin(coin_id, days)
+            raw = _fetch_coin(coin_id, MAX_DAYS)
             for series_id, field in extractions:
                 results[series_id] = _extract_series(raw, field)
             time.sleep(6)  # respect free-tier rate limits
