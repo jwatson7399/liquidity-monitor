@@ -8,6 +8,7 @@ import requests
 
 FRED_BASE_URL = "https://api.stlouisfed.org/fred/series/observations"
 
+# US liquidity series (displayed in the main table)
 SERIES = {
     "WALCL": "Fed Balance Sheet",
     "WRESBAL": "Bank Reserves",
@@ -15,6 +16,20 @@ SERIES = {
     "M2SL": "M2 Money Supply",
     "WTREGEN": "Treasury General Account",
 }
+
+# Global central bank + FX series (used for global liquidity calc)
+GLOBAL_SERIES = {
+    "ECBASSETSW": "ECB Balance Sheet",
+}
+
+FX_SERIES = {
+    "DEXUSEU": "EUR/USD Rate",
+}
+
+# Everything we fetch from FRED
+ALL_FRED_SERIES = {**SERIES, **GLOBAL_SERIES, **FX_SERIES}
+
+DEFAULT_LOOKBACK_DAYS = 1900  # ~5.2 years
 
 
 def get_api_key() -> str:
@@ -38,7 +53,9 @@ def fetch_series(
     Returns list of {"date": "YYYY-MM-DD", "value": float} dicts.
     """
     if observation_start is None:
-        observation_start = (datetime.now() - timedelta(days=120)).strftime("%Y-%m-%d")
+        observation_start = (
+            datetime.now() - timedelta(days=DEFAULT_LOOKBACK_DAYS)
+        ).strftime("%Y-%m-%d")
 
     params = {
         "series_id": series_id,
@@ -48,7 +65,7 @@ def fetch_series(
         "sort_order": "desc",
     }
 
-    resp = requests.get(FRED_BASE_URL, params=params, timeout=15)
+    resp = requests.get(FRED_BASE_URL, params=params, timeout=30)
     resp.raise_for_status()
     data = resp.json()
 
@@ -65,8 +82,12 @@ def fetch_series(
 
 
 def fetch_all(api_key: str, observation_start: Optional[str] = None) -> dict:
-    """Fetch all tracked series. Returns {series_id: [observations]}."""
+    """Fetch all tracked FRED series. Returns {series_id: [observations]}."""
     results = {}
-    for series_id in SERIES:
-        results[series_id] = fetch_series(series_id, api_key, observation_start)
+    for series_id in ALL_FRED_SERIES:
+        try:
+            results[series_id] = fetch_series(series_id, api_key, observation_start)
+        except Exception as e:
+            print(f"  Warning: failed to fetch {series_id}: {e}")
+            results[series_id] = []
     return results

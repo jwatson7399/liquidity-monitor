@@ -15,7 +15,7 @@ def compute_net_liquidity(fed_assets: float, tga: float, reverse_repos: float) -
     return fed_assets - tga - reverse_repos
 
 
-def get_net_liquidity_history(conn, days: int = 90) -> list[dict]:
+def get_net_liquidity_history(conn, days: int = 2000) -> list[dict]:
     """Build a net liquidity time series from stored data.
 
     Aligns on dates where all three components have values.
@@ -31,6 +31,132 @@ def get_net_liquidity_history(conn, days: int = 90) -> list[dict]:
         nl = compute_net_liquidity(walcl[d], tga[d], rrp[d] * 1000)
         history.append({"date": d, "value": nl})
     return history
+
+
+def get_global_liquidity_history(conn, days: int = 2000) -> list[dict]:
+    """Build global liquidity time series: Fed + ECB (converted to USD).
+
+    Returns values in trillions of USD.
+    """
+    walcl = {r["date"]: r["value"] for r in storage.get_series_history(conn, "WALCL", days)}
+    ecb = {r["date"]: r["value"] for r in storage.get_series_history(conn, "ECBASSETSW", days)}
+    fx = {r["date"]: r["value"] for r in storage.get_series_history(conn, "DEXUSEU", days)}
+
+    if not ecb or not fx:
+        return []
+
+    # Build a lookup for nearest FX rate (forward-fill)
+    fx_dates = sorted(fx.keys())
+    ecb_dates = sorted(ecb.keys())
+
+    history = []
+    fx_idx = 0
+    for d in sorted(set(walcl) & set(ecb)):
+        # Find closest FX rate on or before this date
+        while fx_idx < len(fx_dates) - 1 and fx_dates[fx_idx + 1] <= d:
+            fx_idx += 1
+        if fx_idx >= len(fx_dates) or fx_dates[fx_idx] > d:
+            continue
+        rate = fx[fx_dates[fx_idx]]
+
+        # Fed: millions USD -> trillions
+        fed_t = walcl[d] / 1e6
+        # ECB: millions EUR * USD/EUR rate -> millions USD -> trillions
+        ecb_t = (ecb[d] * rate) / 1e6
+
+        history.append({"date": d, "value": round(fed_t + ecb_t, 4)})
+
+    return history
+
+
+def get_stablecoin_history(conn, days: int = 2000) -> list[dict]:
+    """Build total stablecoin supply time series (USDT + USDC).
+
+    Returns values in billions of USD.
+    """
+    usdt = {r["date"]: r["value"] for r in storage.get_series_history(conn, "USDT_MCAP", days)}
+    usdc = {r["date"]: r["value"] for r in storage.get_series_history(conn, "USDC_MCAP", days)}
+
+    if not usdt:
+        return []
+
+    # Use USDT dates as base, add USDC where available
+    all_dates = sorted(set(usdt) | set(usdc))
+    history = []
+    for d in all_dates:
+        total = usdt.get(d, 0) + usdc.get(d, 0)
+        if total > 0:
+            history.append({"date": d, "value": round(total / 1e9, 2)})
+    return history
+
+
+def get_btc_history(conn, days: int = 2000) -> list[dict]:
+    """Get BTC price history."""
+    rows = storage.get_series_history(conn, "BTC_USD", days)
+    return [{"date": r["date"], "value": round(r["value"], 2)} for r in rows]
+
+
+def get_eth_history(conn, days: int = 2000) -> list[dict]:
+    """Get ETH price history."""
+    rows = storage.get_series_history(conn, "ETH_USD", days)
+    return [{"date": r["date"], "value": round(r["value"], 2)} for r in rows]
+
+
+def get_altcoin_history(conn, days: int = 2000) -> list[dict]:
+    """Get altcoin market cap history (ETH mcap as proxy for total altcoins).
+
+    Returns values in billions of USD.
+    """
+    rows = storage.get_series_history(conn, "ETH_MCAP", days)
+    return [{"date": r["date"], "value": round(r["value"] / 1e9, 2)} for r in rows]
+
+
+def get_liquidity_impulse(net_liq_history: list[dict]) -> dict | None:
+    """Compute 30-day liquidity impulse from net liquidity history.
+
+    Returns {change_billions, change_pct} or None.
+    """
+    if len(net_liq_history) < 2:
+        return None
+
+    current = net_liq_history[-1]
+    current_date = datetime.strptime(current["date"], "%Y-%m-%d")
+    target = current_date - timedelta(days=30)
+
+    # Find closest observation to 30 days ago
+    closest = None
+    for point in net_liq_history:
+        d = datetime.strptime(point["date"], "%Y-%m-%d")
+        if d <= target:
+            closest = point
+        else:
+            break
+
+    if closest is None:
+        return None
+
+    change = current["value"] - closest["value"]
+    pct = (change / abs(closest["value"])) * 100 if closest["value"] != 0 else 0
+
+    return {
+        "change_billions": round(change / 1000, 1),  # millions -> billions
+        "change_pct": round(pct, 2),
+    }
+
+
+def get_regime(impulse: dict | None) -> str:
+    """Determine liquidity regime based on 30-day impulse.
+
+    Returns 'expanding', 'contracting', or 'neutral'.
+    """
+    if impulse is None:
+        return "neutral"
+    # Threshold: +/- $20B over 30 days
+    if impulse["change_billions"] > 20:
+        return "expanding"
+    elif impulse["change_billions"] < -20:
+        return "contracting"
+    return "neutral"
 
 
 def get_current_snapshot(conn) -> dict:
